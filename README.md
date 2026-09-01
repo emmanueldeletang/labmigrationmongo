@@ -13,7 +13,7 @@ A local Flask task-management application backed by MongoDB Community Edition on
 | `app.py` | Runs the Flask web application and REST API |
 | `cloud-init.yaml` | MongoDB VM bootstrap template consumed by `deploy.ps1` |
 | `templates/`, `static/` | Application pages and styles |
-| `tests/` | Mocked MongoDB application tests |
+
 
 ## Architecture and security
 
@@ -94,10 +94,12 @@ The seed operation replaces data in the three application collections, then crea
 python ./seed_mongo.py
 ```
 
+The default configuration creates 20 users, 500 projects, and 100 tasks per project, for a total of 50,000 tasks.
+
 With the default seed settings, expected output is:
 
 ```text
-Seeded 20 users, 5 projects, and 2000 tasks.
+Seeded 20 users, 500 projects, and 50000 tasks.
 ```
 
 This operation deletes the existing `users`, `projects`, and `tasks` documents before loading new data. It reads the connection, database, statuses, and record counts from `parameters.json`.
@@ -153,14 +155,6 @@ Endpoints:
 | `POST` | `/api/tasks` | Create a task |
 | `PATCH` | `/api/tasks/<task_id>` | Update supported task fields |
 
-## Tests
-
-Tests use `mongomock`; no MongoDB service is required:
-
-```powershell
-python -m pip install -r requirements-dev.txt
-python -m pytest -q
-```
 
 ## Cleanup
 

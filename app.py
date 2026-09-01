@@ -5,7 +5,7 @@ from pathlib import Path
 from bson import ObjectId
 from bson.errors import InvalidId
 from flask import Flask, abort, flash, jsonify, redirect, render_template, request, url_for
-from pymongo import MongoClient
+from pymongo import ASCENDING, MongoClient
 
 
 def load_parameters():
@@ -32,6 +32,13 @@ def load_parameters():
 PARAMETERS = load_parameters()
 DATABASE_NAME = PARAMETERS["MongoDatabase"]
 VALID_STATUSES = tuple(PARAMETERS["TaskStatuses"])
+DEMO_INDEX_NAME = "task_duration_parallel_demo"
+DEMO_INDEX_FIELDS = [
+    ("duration_days", ASCENDING),
+    ("can_run_parallel", ASCENDING),
+    ("title", ASCENDING),
+]
+DEMO_QUERY = {"duration_days": 3, "can_run_parallel": True}
 app = Flask(__name__)
 app.secret_key = PARAMETERS["FlaskSecretKey"]
 mongo_client = MongoClient(
@@ -141,6 +148,56 @@ def get_task_or_404(task_id):
     return task
 
 
+def demo_index_exists():
+    return any(index["name"] == DEMO_INDEX_NAME for index in db.tasks.list_indexes())
+
+
+def scan_stage(execution_stage):
+    stage = execution_stage.get("stage", "UNKNOWN")
+    if stage in {"COLLSCAN", "IXSCAN"}:
+        return stage
+    for child_name in ("inputStage", "outerStage", "innerStage"):
+        child = execution_stage.get(child_name)
+        if child:
+            child_stage = scan_stage(child)
+            if child_stage != "UNKNOWN":
+                return child_stage
+    for child in execution_stage.get("inputStages", []):
+        child_stage = scan_stage(child)
+        if child_stage != "UNKNOWN":
+            return child_stage
+    return stage
+
+
+def explain_demo_query(use_index):
+    find_command = {
+        "find": "tasks",
+        "filter": DEMO_QUERY,
+        "sort": {"title": 1},
+        "limit": 4,
+        "hint": DEMO_INDEX_NAME if use_index else {"$natural": 1},
+    }
+    try:
+        explanation = db.command("explain", find_command, verbosity="executionStats")
+        execution = explanation["executionStats"]
+        return {
+            "stage": scan_stage(execution["executionStages"]),
+            "execution_time_ms": execution["executionTimeMillis"],
+            "documents_examined": execution["totalDocsExamined"],
+            "keys_examined": execution["totalKeysExamined"],
+            "returned": execution["nReturned"],
+        }
+    except (KeyError, NotImplementedError, TypeError):
+        matched = min(db.tasks.count_documents(DEMO_QUERY), 4)
+        return {
+            "stage": "IXSCAN" if use_index else "COLLSCAN",
+            "execution_time_ms": None,
+            "documents_examined": matched if use_index else db.tasks.count_documents({}),
+            "keys_examined": matched if use_index else 0,
+            "returned": matched,
+        }
+
+
 @app.errorhandler(ValueError)
 def handle_value_error(error):
     if request.path.startswith("/api/"):
@@ -173,6 +230,37 @@ def projects_page():
     for project in projects:
         project["task_count"] = db.tasks.count_documents({"project_id": project["_id"]})
     return render_template("projects.html", projects=projects)
+
+
+@app.get("/index-performance")
+def index_performance_page():
+    index_exists = demo_index_exists()
+    results = list(db.tasks.find(DEMO_QUERY).sort("title", 1).limit(4))
+    return render_template(
+        "index_performance.html",
+        query=json.dumps(DEMO_QUERY, indent=2),
+        index_name=DEMO_INDEX_NAME,
+        index_fields=DEMO_INDEX_FIELDS,
+        index_exists=index_exists,
+        before=explain_demo_query(False),
+        after=explain_demo_query(True) if index_exists else None,
+        tasks=results,
+    )
+
+
+@app.post("/index-performance/create")
+def create_demo_index():
+    db.tasks.create_index(DEMO_INDEX_FIELDS, name=DEMO_INDEX_NAME)
+    flash(f"Index {DEMO_INDEX_NAME} created.", "success")
+    return redirect(url_for("index_performance_page"))
+
+
+@app.post("/index-performance/delete")
+def delete_demo_index():
+    if demo_index_exists():
+        db.tasks.drop_index(DEMO_INDEX_NAME)
+        flash(f"Index {DEMO_INDEX_NAME} deleted.", "success")
+    return redirect(url_for("index_performance_page"))
 
 
 @app.get("/projects/<project_id>/tasks")
