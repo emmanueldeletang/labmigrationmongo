@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Index performance · Taskboard{% endblock %}
+{% block content %}
+<section class="page-heading index-heading">
+  <div>
+    <p class="eyebrow">MongoDB query lab</p>
+    <h1>See what an index changes</h1>
+    <p>Compare the same selective task query as a forced collection scan and as a compound index scan.</p>
+  </div>
+  {% if index_exists %}
+  <form method="post" action="{{ url_for('delete_demo_index') }}">
+    <button class="button danger" type="submit">Delete index</button>
+  </form>
+  {% else %}
+  <form method="post" action="{{ url_for('create_demo_index') }}">
+    <button class="button primary" type="submit">Create index</button>
+  </form>
+  {% endif %}
+</section>
+
+<section class="query-panel" aria-labelledby="query-title">
+  <div>
+    <p class="eyebrow">Query under test</p>
+    <h2 id="query-title">Find four matching tasks</h2>
+  </div>
+  <pre><code>db.tasks.find({{ query }}).sort({ title: 1 }).limit(4)</code></pre>
+  <p class="muted">Demo index: <code>{{ index_name }}</code> on
+    {% for field, direction in index_fields %}<code>{{ field }}: {{ direction }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+  </p>
+</section>
+
+<section class="explain-grid" aria-label="Explain comparison">
+  <article class="explain-panel baseline">
+    <div class="explain-title">
+      <div><p class="eyebrow">Before</p><h2>Without the index</h2></div>
+      <span class="plan-stage">{{ before.stage }}</span>
+    </div>
+    <dl class="explain-stats">
+      <div><dt>Documents examined</dt><dd>{{ before.documents_examined }}</dd></div>
+      <div><dt>Keys examined</dt><dd>{{ before.keys_examined }}</dd></div>
+      <div><dt>Documents returned</dt><dd>{{ before.returned }}</dd></div>
+      <div><dt>Execution time</dt><dd>{{ before.execution_time_ms if before.execution_time_ms is not none else 'n/a' }} ms</dd></div>
+    </dl>
+    <p>A natural scan inspects the collection instead of using an index. As the collection grows, the examined-document count grows with it.</p>
+  </article>
+
+  <article class="explain-panel optimized {% if not after %}waiting{% endif %}">
+    <div class="explain-title">
+      <div><p class="eyebrow">After</p><h2>With the compound index</h2></div>
+      <span class="plan-stage">{{ after.stage if after else 'Not created' }}</span>
+    </div>
+    {% if after %}
+    <dl class="explain-stats">
+      <div><dt>Documents examined</dt><dd>{{ after.documents_examined }}</dd></div>
+      <div><dt>Keys examined</dt><dd>{{ after.keys_examined }}</dd></div>
+      <div><dt>Documents returned</dt><dd>{{ after.returned }}</dd></div>
+      <div><dt>Execution time</dt><dd>{{ after.execution_time_ms if after.execution_time_ms is not none else 'n/a' }} ms</dd></div>
+    </dl>
+    <p>The compound index narrows the matching keys and supports title ordering, reducing document work for this query shape.</p>
+    {% else %}
+    <div class="waiting-copy">
+      <strong>Create the index to run the second explain plan.</strong>
+      <span>The baseline remains visible for comparison.</span>
+    </div>
+    {% endif %}
+  </article>
+</section>
+
+<section class="section-heading result-heading">
+  <div><p class="eyebrow">Query result</p><h2>{{ tasks|length }} matching tasks</h2></div>
+</section>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Task</th><th>Duration</th><th>Parallel</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for task in tasks %}
+      <tr>
+        <td><a class="task-link" href="{{ url_for('task_detail_page', task_id=task._id) }}">{{ task.title }}</a></td>
+        <td>{{ task.duration_days }} days</td>
+        <td>{{ 'Yes' if task.can_run_parallel else 'No' }}</td>
+        <td><span class="status {{ task.status }}">{{ task.status | replace('_', ' ') }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td class="empty" colspan="4">No tasks match the demo query. Load the seed data first.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
