@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ task.title }} · Taskboard{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div><p class="eyebrow"><a href="{{ url_for('project_tasks_page', project_id=project._id) }}">{{ project.name }}</a></p><h1>{{ task.title }}</h1></div>
+  <span class="status {{ task.status }}">{{ task.status | replace('_', ' ') }}</span>
+</section>
+<div class="detail-layout">
+  <section class="detail-main">
+    <h2>Description</h2><p>{{ task.description or 'No description provided.' }}</p>
+    <h2>Dependencies</h2>
+    <div class="dependency-list">
+      {% for dependency in dependencies %}
+      <a href="{{ url_for('task_detail_page', task_id=dependency._id) }}">{{ dependency.title }} <span class="status {{ dependency.status }}">{{ dependency.status | replace('_', ' ') }}</span></a>
+      {% else %}<p class="muted">This task has no dependencies.</p>{% endfor %}
+    </div>
+  </section>
+  <aside class="task-controls">
+    <h2>Task controls</h2>
+    <form method="post" action="{{ url_for('update_task_page', task_id=task._id) }}">
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        {% for status in statuses %}<option value="{{ status }}" {% if task.status == status %}selected{% endif %}>{{ status | replace('_', ' ') }}</option>{% endfor %}
+      </select>
+      <label for="assigned_user_id">Assignee</label>
+      <select id="assigned_user_id" name="assigned_user_id">
+        {% for user in users %}<option value="{{ user._id }}" {% if task.assigned_user_id == user._id %}selected{% endif %}>{{ user.name }}</option>{% endfor %}
+      </select>
+      <button class="button primary" type="submit">Save changes</button>
+    </form>
+    <dl>
+      <div><dt>Duration</dt><dd>{{ task.duration_days }} day{% if task.duration_days != 1 %}s{% endif %}</dd></div>
+      <div><dt>Parallel</dt><dd>{{ 'Yes' if task.can_run_parallel else 'No' }}</dd></div>
+      <div><dt>Updated</dt><dd>{{ task.updated_at.strftime('%Y-%m-%d %H:%M') }}</dd></div>
+    </dl>
+  </aside>
+</div>
+{% endblock %}

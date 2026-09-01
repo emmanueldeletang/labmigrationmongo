@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} · Taskboard{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div><p class="eyebrow">Project tasks</p><h1>{{ project.name }}</h1><p>{{ project.description }}</p></div>
+  <a class="button primary" href="{{ url_for('create_task_page', project_id=project._id) }}">New task</a>
+</section>
+<div class="filter-bar" aria-label="Filter tasks">
+  <a class="filter" href="{{ url_for('project_tasks_page', project_id=project._id) }}">All</a>
+  {% for status in statuses %}
+  <a class="filter" href="{{ url_for('project_tasks_page', project_id=project._id, status=status) }}">{{ status | replace('_', ' ') }}</a>
+  {% endfor %}
+</div>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Task</th><th>Status</th><th>Assignee</th><th>Duration</th><th>Depends on</th></tr></thead>
+    <tbody>
+      {% for task in tasks %}
+      <tr>
+        <td><a class="task-link" href="{{ url_for('task_detail_page', task_id=task._id) }}">{{ task.title }}</a><span class="table-subtitle">{{ task.description }}</span></td>
+        <td><span class="status {{ task.status }}">{{ task.status | replace('_', ' ') }}</span></td>
+        <td>{{ users[task.assigned_user_id].name if task.assigned_user_id in users else 'Unassigned' }}</td>
+        <td>{{ task.duration_days }} day{% if task.duration_days != 1 %}s{% endif %}</td>
+        <td>{{ task.dependencies | length }}</td>
+      </tr>
+      {% else %}<tr><td colspan="5" class="empty">No tasks match this filter.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

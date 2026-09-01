@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · Taskboard{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">Workspace overview</p>
+    <h1>Delivery dashboard</h1>
+  </div>
+  <a class="button primary" href="{{ url_for('create_task_page') }}">Create task</a>
+</section>
+<section class="metrics" aria-label="Workspace totals">
+  <article><span>Users</span><strong>{{ summary.users }}</strong></article>
+  <article><span>Projects</span><strong>{{ summary.projects }}</strong></article>
+  <article><span>Tasks</span><strong>{{ summary.tasks }}</strong></article>
+</section>
+<section class="section-heading">
+  <div><p class="eyebrow">Portfolio</p><h2>Work by status</h2></div>
+</section>
+<div class="status-grid">
+  {% for status, count in summary.statuses.items() %}
+  <article class="status-panel">
+    <span class="status {{ status }}">{{ status | replace('_', ' ') }}</span>
+    <strong>{{ count }}</strong>
+    <span class="muted">tasks</span>
+  </article>
+  {% endfor %}
+</div>
+{% endblock %}
