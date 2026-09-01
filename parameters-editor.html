@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MongoLab Parameters</title>
+  <script>
+    (() => {
+      const param = new URLSearchParams(window.location.search).get("scoutTheme");
+      const theme =
+        param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --cp-bg: #f7f4ef;
+      --cp-bg-elevated: #fcfbf8;
+      --cp-surface: #ffffff;
+      --cp-surface-soft: #f5f5f5;
+      --cp-border: #dedede;
+      --cp-border-strong: #919191;
+      --cp-text: #242424;
+      --cp-text-muted: #5c5c5c;
+      --cp-text-soft: #6f6f6f;
+      --cp-accent: #b11f4b;
+      --cp-accent-hover: #9a1a41;
+      --cp-accent-soft: rgba(177, 31, 75, 0.08);
+      --cp-accent-fg: #ffffff;
+      --cp-success: #16a34a;
+      --cp-danger: #dc2626;
+      --cp-warning: #f59e0b;
+      --cp-link: #0078d4;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+      --cp-overlay: rgba(255, 255, 255, 0.8);
+      --cp-panel: rgba(255, 255, 255, 0.86);
+      --cp-panel-strong: rgba(255, 255, 255, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.55);
+      --cp-highlight: rgba(177, 31, 75, 0.12);
+    }
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --cp-bg: #3d3b3a;
+      --cp-bg-elevated: #343231;
+      --cp-surface: #292929;
+      --cp-surface-soft: #2e2e2e;
+      --cp-border: #474747;
+      --cp-border-strong: #5f5f5f;
+      --cp-text: #dedede;
+      --cp-text-muted: #919191;
+      --cp-text-soft: #b0b0b0;
+      --cp-accent: #fd8ea1;
+      --cp-accent-hover: #fb7b91;
+      --cp-accent-soft: rgba(253, 142, 161, 0.14);
+      --cp-accent-fg: #1a1a1a;
+      --cp-success: #4ade80;
+      --cp-danger: #f87171;
+      --cp-warning: #fbbf24;
+      --cp-link: #4da6ff;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+      --cp-overlay: rgba(41, 41, 41, 0.88);
+      --cp-panel: rgba(41, 41, 41, 0.72);
+      --cp-panel-strong: rgba(41, 41, 41, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.04);
+      --cp-highlight: rgba(253, 142, 161, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background: var(--cp-bg);
+      color: var(--cp-text);
+      font-family: "Segoe UI", Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    button, input, textarea { font: inherit; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible {
+      outline: 3px solid var(--cp-highlight);
+      outline-offset: 2px;
+    }
+    .shell { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 56px; }
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--cp-border);
+    }
+    .identity { display: flex; align-items: center; gap: 14px; }
+    .mark {
+      display: grid;
+      width: 44px;
+      height: 44px;
+      place-items: center;
+      border: 1px solid var(--cp-accent);
+      border-radius: 0.625rem;
+      color: var(--cp-accent);
+      font-family: Consolas, "Courier New", Courier, monospace;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    h1 { margin: 0; font-size: 24px; font-weight: 650; letter-spacing: 0; }
+    .filename { margin: 3px 0 0; color: var(--cp-text-muted); font-family: Consolas, "Courier New", Courier, monospace; font-size: 13px; }
+    .toolbar { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    button {
+      min-height: 38px;
+      padding: 8px 14px;
+      border: 1px solid var(--cp-border-strong);
+      border-radius: 0.625rem;
+      background: var(--cp-surface);
+      color: var(--cp-text);
+      cursor: pointer;
+    }
+    button:hover:not(:disabled) { border-color: var(--cp-accent); color: var(--cp-accent); }
+    button.primary { border-color: var(--cp-accent); background: var(--cp-accent); color: var(--cp-accent-fg); }
+    button.primary:hover:not(:disabled) { background: var(--cp-accent-hover); color: var(--cp-accent-fg); }
+    button:disabled { cursor: not-allowed; opacity: 0.5; }
+    .statusbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 50px;
+      color: var(--cp-text-muted);
+      font-size: 13px;
+    }
+    .status { display: flex; align-items: center; gap: 8px; }
+    .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--cp-border-strong); }
+    .status.changed::before { background: var(--cp-warning); }
+    .status.saved::before { background: var(--cp-success); }
+    .status.error::before { background: var(--cp-danger); }
+    .count { font-family: Consolas, "Courier New", Courier, monospace; }
+    .empty {
+      display: grid;
+      min-height: 420px;
+      place-items: center;
+      border: 1px dashed var(--cp-border-strong);
+      border-radius: 16px;
+      background: var(--cp-bg-elevated);
+      text-align: center;
+    }
+    .empty strong { display: block; margin-bottom: 6px; font-size: 18px; }
+    .empty span { color: var(--cp-text-muted); }
+    .parameter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .field {
+      min-width: 0;
+      padding: 16px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-surface);
+      box-shadow: 0 0 2px var(--cp-border), 0 1px 2px var(--cp-border);
+    }
+    .field.wide { grid-column: 1 / -1; }
+    .field-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+    label { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+    .type { color: var(--cp-text-soft); font-family: Consolas, "Courier New", Courier, monospace; font-size: 11px; text-transform: uppercase; }
+    input[type="text"], input[type="password"], input[type="number"], textarea {
+      width: 100%;
+      border: 1px solid var(--cp-border-strong);
+      border-radius: 0.625rem;
+      background: var(--cp-bg-elevated);
+      color: var(--cp-text);
+      padding: 10px 12px;
+    }
+    textarea { min-height: 98px; resize: vertical; font-family: Consolas, "Courier New", Courier, monospace; line-height: 1.5; }
+    .secret-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+    .icon-button { width: 42px; padding: 0; font-family: Consolas, "Courier New", Courier, monospace; font-weight: 700; }
+    .toggle { display: inline-flex; align-items: center; gap: 10px; min-height: 42px; }
+    .toggle input { width: 20px; height: 20px; accent-color: var(--cp-accent); }
+    footer { margin-top: 20px; color: var(--cp-text-soft); font-size: 12px; text-align: right; }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 760px) {
+      .shell { width: min(100% - 20px, 1120px); padding-top: 18px; }
+      header { align-items: stretch; flex-direction: column; }
+      .toolbar { justify-content: flex-start; }
+      .parameter-grid { grid-template-columns: 1fr; }
+      .field.wide { grid-column: auto; }
+      .statusbar { align-items: flex-start; flex-direction: column; padding: 12px 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="identity">
+        <div class="mark" aria-hidden="true">{ }</div>
+        <div>
+          <h1>MongoLab Parameters</h1>
+          <p class="filename" id="filename">No file loaded</p>
+        </div>
+      </div>
+      <div class="toolbar" aria-label="File actions">
+        <button id="openButton" type="button">Open JSON</button>
+        <button id="saveAsButton" type="button" disabled>Save as</button>
+        <button class="primary" id="saveButton" type="button" disabled>Save</button>
+      </div>
+    </header>
+
+    <div class="statusbar" aria-live="polite">
+      <div class="status" id="status">Select parameters.json</div>
+      <div class="count" id="count"></div>
+    </div>
+
+    <section class="empty" id="emptyState">
+      <div>
+        <strong>No parameters loaded</strong>
+        <span>Open the project parameter file to begin.</span>
+      </div>
+    </section>
+    <form class="parameter-grid" id="parameterForm" hidden></form>
+
+    <input id="fileInput" type="file" accept="application/json,.json" hidden>
+    <footer>Ctrl+S saves the current document</footer>
+  </main>
+
+  <script>
+    const form = document.querySelector("#parameterForm");
+    const emptyState = document.querySelector("#emptyState");
+    const fileInput = document.querySelector("#fileInput");
+    const openButton = document.querySelector("#openButton");
+    const saveButton = document.querySelector("#saveButton");
+    const saveAsButton = document.querySelector("#saveAsButton");
+    const filename = document.querySelector("#filename");
+    const status = document.querySelector("#status");
+    const count = document.querySelector("#count");
+
+    let parameters = null;
+    let fileHandle = null;
+    let dirty = false;
+
+    function setStatus(message, state = "") {
+      status.textContent = message;
+      status.className = `status ${state}`.trim();
+    }
+
+    function markChanged() {
+      dirty = true;
+      saveButton.disabled = false;
+      setStatus("Unsaved changes", "changed");
+    }
+
+    function isSecret(key) {
+      return /password|secret|token/i.test(key) && key !== "ResourceToken";
+    }
+
+    function makeInput(key, value) {
+      let input;
+      let typeName = Array.isArray(value) ? "array" : typeof value;
+
+      if (Array.isArray(value) || (value !== null && typeof value === "object")) {
+        input = document.createElement("textarea");
+        input.value = JSON.stringify(value, null, 2);
+      } else if (typeof value === "boolean") {
+        const wrapper = document.createElement("label");
+        wrapper.className = "toggle";
+        input = document.createElement("input");
+        input.type = "checkbox";
+        input.checked = value;
+        const text = document.createElement("span");
+        text.textContent = "Enabled";
+        wrapper.append(input, text);
+        return { control: wrapper, input, typeName };
+      } else {
+        input = document.createElement("input");
+        input.type = typeof value === "number" ? "number" : isSecret(key) ? "password" : "text";
+        input.value = value ?? "";
+        if (typeof value === "number") input.step = "any";
+      }
+
+      if (isSecret(key) && input.tagName === "INPUT") {
+        const wrapper = document.createElement("div");
+        wrapper.className = "secret-row";
+        const reveal = document.createElement("button");
+        reveal.type = "button";
+        reveal.className = "icon-button";
+        reveal.textContent = "Aa";
+        reveal.title = "Show or hide value";
+        reveal.setAttribute("aria-label", "Show or hide value");
+        reveal.addEventListener("click", () => {
+          input.type = input.type === "password" ? "text" : "password";
+        });
+        wrapper.append(input, reveal);
+        return { control: wrapper, input, typeName };
+      }
+      return { control: input, input, typeName };
+    }
+
+    function render() {
+      form.replaceChildren();
+      Object.entries(parameters).forEach(([key, value]) => {
+        const field = document.createElement("div");
+        const { control, input, typeName } = makeInput(key, value);
+        field.className = `field ${Array.isArray(value) || (value !== null && typeof value === "object") ? "wide" : ""}`.trim();
+
+        const heading = document.createElement("div");
+        heading.className = "field-header";
+        const label = document.createElement("label");
+        label.textContent = key;
+        label.htmlFor = `parameter-${key}`;
+        const type = document.createElement("span");
+        type.className = "type";
+        type.textContent = typeName;
+        heading.append(label, type);
+
+        input.id = `parameter-${key}`;
+        input.dataset.key = key;
+        input.dataset.type = typeName;
+        input.addEventListener("input", markChanged);
+        input.addEventListener("change", markChanged);
+        field.append(heading, control);
+        form.append(field);
+      });
+
+      emptyState.hidden = true;
+      form.hidden = false;
+      saveButton.disabled = false;
+      saveAsButton.disabled = false;
+      count.textContent = `${Object.keys(parameters).length} parameters`;
+    }
+
+    function collectParameters() {
+      const next = {};
+      for (const [key, originalValue] of Object.entries(parameters)) {
+        const input = form.querySelector(`[data-key="${CSS.escape(key)}"]`);
+        if (Array.isArray(originalValue) || (originalValue !== null && typeof originalValue === "object")) {
+          try {
+            next[key] = JSON.parse(input.value);
+          } catch (error) {
+            input.focus();
+            throw new Error(`${key} must contain valid JSON.`);
+          }
+        } else if (typeof originalValue === "boolean") {
+          next[key] = input.checked;
+        } else if (typeof originalValue === "number") {
+          if (input.value.trim() === "" || !Number.isFinite(Number(input.value))) {
+            input.focus();
+            throw new Error(`${key} must be a number.`);
+          }
+          next[key] = Number(input.value);
+        } else {
+          next[key] = input.value;
+        }
+      }
+      return next;
+    }
+
+    async function loadFile(file, handle = null) {
+      try {
+        const parsed = JSON.parse(await file.text());
+        if (parsed === null || Array.isArray(parsed) || typeof parsed !== "object") {
+          throw new Error("The root JSON value must be an object.");
+        }
+        parameters = parsed;
+        fileHandle = handle;
+        filename.textContent = file.name;
+        dirty = false;
+        render();
+        setStatus("File loaded", "saved");
+      } catch (error) {
+        setStatus(error.message, "error");
+      }
+    }
+
+    async function openFile() {
+      if ("showOpenFilePicker" in window) {
+        try {
+          const [handle] = await window.showOpenFilePicker({
+            types: [{ description: "JSON files", accept: { "application/json": [".json"] } }],
+            multiple: false
+          });
+          await loadFile(await handle.getFile(), handle);
+        } catch (error) {
+          if (error.name !== "AbortError") setStatus(error.message, "error");
+        }
+      } else {
+        fileInput.click();
+      }
+    }
+
+    function download(content, name) {
+      const url = URL.createObjectURL(new Blob([content], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function writeFile(saveAs = false) {
+      if (!parameters) return;
+      try {
+        const next = collectParameters();
+        const content = `${JSON.stringify(next, null, 2)}\n`;
+        let target = saveAs ? null : fileHandle;
+
+        if (!target && "showSaveFilePicker" in window) {
+          target = await window.showSaveFilePicker({
+            suggestedName: filename.textContent === "No file loaded" ? "parameters.json" : filename.textContent,
+            types: [{ description: "JSON files", accept: { "application/json": [".json"] } }]
+          });
+        }
+
+        if (target) {
+          const writable = await target.createWritable();
+          await writable.write(content);
+          await writable.close();
+          fileHandle = target;
+          filename.textContent = target.name;
+        } else {
+          download(content, filename.textContent === "No file loaded" ? "parameters.json" : filename.textContent);
+        }
+
+        parameters = next;
+        dirty = false;
+        setStatus("Saved", "saved");
+      } catch (error) {
+        if (error.name !== "AbortError") setStatus(error.message, "error");
+      }
+    }
+
+    openButton.addEventListener("click", openFile);
+    saveButton.addEventListener("click", () => writeFile(false));
+    saveAsButton.addEventListener("click", () => writeFile(true));
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files[0]) loadFile(fileInput.files[0]);
+      fileInput.value = "";
+    });
+    document.addEventListener("keydown", (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        writeFile(false);
+      }
+    });
+    window.addEventListener("beforeunload", (event) => {
+      if (dirty) event.preventDefault();
+    });
+  </script>
+</body>
+</html>

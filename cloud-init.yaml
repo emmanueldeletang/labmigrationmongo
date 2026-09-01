@@ -1,0 +1,88 @@
+#cloud-config
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+
+write_files:
+  - path: /root/mongodb-bootstrap.env
+    permissions: "0600"
+    content: |
+      MONGO_APP_USERNAME=__MONGO_APP_USERNAME__
+      MONGO_APP_PASSWORD=__MONGO_APP_PASSWORD__
+      MONGO_DATABASE=__MONGO_DATABASE__
+  - path: /usr/local/sbin/setup-mongodb
+    permissions: "0700"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      source /root/mongodb-bootstrap.env
+      export DEBIAN_FRONTEND=noninteractive
+
+      if [[ ! -f /usr/share/keyrings/mongodb-server-8.0.gpg ]]; then
+        curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc \
+          | gpg --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg
+      fi
+      echo "deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse" \
+        > /etc/apt/sources.list.d/mongodb-org-8.0.list
+      apt-get update
+      apt-get install -y mongodb-org
+
+      sed -i -E 's/^([[:space:]]*)bindIp:.*/\1bindIp: 0.0.0.0/' /etc/mongod.conf
+
+      # Workshop-aligned layout: prefer a dedicated Azure data disk at /data.
+      if [[ -b /dev/disk/azure/scsi1/lun0 ]]; then
+        mkdir -p /data
+        if ! lsblk -no FSTYPE /dev/disk/azure/scsi1/lun0 | grep -q .; then
+          mkfs.ext4 -F /dev/disk/azure/scsi1/lun0
+        fi
+        if ! grep -q '/dev/disk/azure/scsi1/lun0 /data ext4' /etc/fstab; then
+          echo '/dev/disk/azure/scsi1/lun0 /data ext4 defaults,nofail 0 2' >> /etc/fstab
+        fi
+        mount -a
+        mkdir -p /data/db
+        chown -R mongodb:mongodb /data/db
+        sed -i -E 's|^([[:space:]]*)dbPath:.*|\1dbPath: /data/db|' /etc/mongod.conf
+      fi
+
+      systemctl enable --now mongod
+      for attempt in {1..30}; do
+        mongosh --quiet --eval 'db.adminCommand({ ping: 1 })' >/dev/null 2>&1 && break
+        sleep 2
+      done
+      mongosh --quiet --eval 'db.adminCommand({ ping: 1 })' >/dev/null
+
+      MONGO_APP_USERNAME="$MONGO_APP_USERNAME" MONGO_APP_PASSWORD="$MONGO_APP_PASSWORD" \
+        MONGO_DATABASE="$MONGO_DATABASE" mongosh --quiet admin --eval '
+          if (!db.getUser(process.env.MONGO_APP_USERNAME)) {
+            db.createUser({
+              user: process.env.MONGO_APP_USERNAME,
+              pwd: process.env.MONGO_APP_PASSWORD,
+              roles: [
+                { role: "readWrite", db: process.env.MONGO_DATABASE },
+                { role: "clusterMonitor", db: "admin" }
+              ]
+            });
+          } else {
+            db.updateUser(process.env.MONGO_APP_USERNAME, {
+              roles: [
+                { role: "readWrite", db: process.env.MONGO_DATABASE },
+                { role: "clusterMonitor", db: "admin" }
+              ]
+            });
+          }
+        '
+      if ! grep -q '^[[:space:]]*authorization:[[:space:]]*enabled' /etc/mongod.conf; then
+        cat >> /etc/mongod.conf <<'MONGO_SECURITY'
+      security:
+        authorization: enabled
+      MONGO_SECURITY
+      fi
+      systemctl restart mongod
+      rm -f /root/mongodb-bootstrap.env
+
+runcmd:
+  - [bash, /usr/local/sbin/setup-mongodb]
+
+final_message: "MongoDB provisioning finished after $UPTIME seconds."
