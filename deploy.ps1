@@ -71,6 +71,21 @@ function Assert-LastExitCode {
     }
 }
 
+function Set-ParameterValue {
+    param(
+        [Parameter(Mandatory)]
+        [pscustomobject]$Parameters,
+
+        [Parameter(Mandatory)]
+        [string]$Name,
+
+        [AllowNull()]
+        [object]$Value
+    )
+
+    $Parameters | Add-Member -MemberType NoteProperty -Name $Name -Value $Value -Force
+}
+
 function New-LowercaseToken {
     -join (1..5 | ForEach-Object { [char](Get-Random -Minimum 97 -Maximum 123) })
 }
@@ -154,7 +169,6 @@ if ([string]::IsNullOrWhiteSpace($SshSourceAddressPrefix)) {
 if ($SshSourceAddressPrefix -notmatch '^(\d{1,3}\.){3}\d{1,3}/([0-9]|[12][0-9]|3[0-2])$') {
     throw "SshSourceAddressPrefix must be an IPv4 CIDR such as 203.0.113.10/32."
 }
-$deploymentParameters.SshSourceAddressPrefix = $SshSourceAddressPrefix
 
 try {
     $cloudInitPath = Join-Path ([System.IO.Path]::GetTempPath()) "cloud-init-$ResourceToken.yaml"
@@ -282,12 +296,21 @@ sudo systemctl restart mongod
     $encodedUsername = [Uri]::EscapeDataString($mongoUsername)
     $encodedPassword = [Uri]::EscapeDataString($mongoPassword)
     $mongoUri = "mongodb://${encodedUsername}:${encodedPassword}@${publicIp}:${mongoPort}/${mongoDatabase}?authSource=admin"
-    $deploymentParameters.ResourceToken = $ResourceToken
-    $deploymentParameters.MongoUri = $mongoUri
-    $deploymentParameters.PublicIpAddress = $publicIp
-    $deploymentParameters.DeploymentLocation = $selectedLocation
-    $deploymentParameters.ResourceGroupName = $resourceGroupName
-    $deploymentParameters.VmName = $vmName
+
+    $generatedParameters = [ordered]@{
+        ResourceToken = $ResourceToken
+        SshSourceAddressPrefix = $SshSourceAddressPrefix
+        MongoUri = $mongoUri
+        PublicIpAddress = $publicIp
+        DeploymentLocation = $selectedLocation
+        ResourceGroupName = $resourceGroupName
+        VmName = $vmName
+    }
+    foreach ($generatedParameter in $generatedParameters.GetEnumerator()) {
+        Set-ParameterValue -Parameters $deploymentParameters `
+            -Name $generatedParameter.Key -Value $generatedParameter.Value
+    }
+
     $parameterContent = $deploymentParameters | ConvertTo-Json -Depth 10
     Set-Content -LiteralPath $ParametersFile -Value $parameterContent -Encoding utf8
     Write-Host "`nDeployment complete."
