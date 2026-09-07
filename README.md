@@ -20,7 +20,7 @@ A local Flask task-management application backed by MongoDB Community Edition on
 - MongoDB runs on Ubuntu 22.04 and uses the attached data disk at `/data/db` when available.
 - MongoDB authorization is enabled and the configured user is created in the `admin` authentication database.
 - MongoDB listens on all VM interfaces so the local Python processes can connect directly.
-- The network security group allows SSH and MongoDB only from `SshSourceAddressPrefix`.
+- The network security group limits SSH to `SshSourceAddressPrefix` but allows MongoDB traffic on the configured port from and to all IP addresses.
 - Trusted Launch, Secure Boot, vTPM, a managed identity, a Standard public IP, and a Standard SSD are enabled by default through `parameters.json`.
 - VM auto-shutdown defaults to 19:00 UTC and is configurable.
 
@@ -45,7 +45,7 @@ Open [parameters-editor.html](parameters-editor.html) locally in Microsoft Edge 
 
 The browser requires you to select the file explicitly before it grants read/write access. `Ctrl+S` saves the loaded document. In browsers without the File System Access API, Save downloads an updated JSON file instead.
 
-Before deployment, replace `VmAdminPassword`, `MongoPassword`, and `FlaskSecretKey`. The VM password must contain at least 12 characters with uppercase, lowercase, numeric, and special characters. `ResourceToken` must contain one to five lowercase letters.
+Before deployment, replace `VmAdminPassword`, `MongoPassword`, and `FlaskSecretKey`. The VM password must contain at least 12 characters with uppercase, lowercase, numeric, and special characters. 
 
 ## Deploy to Azure
 
@@ -68,36 +68,9 @@ Every deployment deletes and recreates the generated resource group. This perman
 
 After deployment, the installer updates `MongoUri`, `PublicIpAddress`, `DeploymentLocation`, `ResourceGroupName`, and `VmName` without removing the other settings. Provisioning logs are available on the VM:
 
-```powershell
-ssh <VmAdminUsername>@<PublicIpAddress>
-sudo cloud-init status --long
-sudo journalctl -u cloud-final -u mongod --no-pager
-```
+
 
 ## Run from VS Code
-
-### Use the development container
-
-With Docker and the VS Code Dev Containers extension installed, open the
-repository in VS Code and select **Dev Containers: Reopen in Container**.
-The container provides Python, PowerShell, Azure CLI, the project dependencies,
-and the recommended Python, Azure, PowerShell, and MongoDB extensions. pip uses
-Microsoft's package feed proxy so dependency installation also works on managed
-networks that block public package download hosts. Port 5000 is forwarded
-automatically when Flask starts.
-
-Inside the container, deploy and run the project with:
-
-```powershell
-./deploy.ps1
-python ./seed_mongo.py
-python ./app.py
-```
-
-The deployment still requires interactive Azure device-code authentication,
-and `parameters.json` must contain the required configuration.
-
-### Use a local Python environment
 
 Create and activate a virtual environment:
 

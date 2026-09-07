@@ -212,9 +212,13 @@ try {
         Assert-LastExitCode "SSH rule creation"
     }
     az network nsg rule create --resource-group $resourceGroupName --nsg-name $nsgName --name AllowMongoDb `
-        --priority 120 --direction Inbound --access Allow --protocol Tcp --source-address-prefixes $SshSourceAddressPrefix `
-        --destination-port-ranges $mongoPort --output none
-    Assert-LastExitCode "MongoDB rule creation"
+        --priority 120 --direction Inbound --access Allow --protocol Tcp --source-address-prefixes "*" `
+        --source-port-ranges "*" --destination-address-prefixes "*" --destination-port-ranges $mongoPort --output none
+    Assert-LastExitCode "MongoDB inbound rule creation"
+    az network nsg rule create --resource-group $resourceGroupName --nsg-name $nsgName --name AllowMongoDbOutbound `
+        --priority 120 --direction Outbound --access Allow --protocol Tcp --source-address-prefixes "*" `
+        --source-port-ranges "*" --destination-address-prefixes "*" --destination-port-ranges $mongoPort --output none
+    Assert-LastExitCode "MongoDB outbound rule creation"
     $appRuleExist = az network nsg rule show --resource-group $resourceGroupName --nsg-name $nsgName --name AllowFlask 2>$null
     if ($appRuleExist) {
         az network nsg rule delete --resource-group $resourceGroupName --nsg-name $nsgName --name AllowFlask --output none
@@ -242,7 +246,8 @@ try {
             --nics $nicName --image $vmImage --size $VmSize --admin-username $vmAdminUsername `
             --authentication-type password --admin-password $plainPassword --custom-data $cloudInitPath `
             --storage-sku "os=$osDiskStorageSku" --security-type $securityType --enable-secure-boot true `
-            --enable-vtpm true --assign-identity --data-disk-sizes-gb $DataDiskSizeGB --output none
+            --enable-vtpm true --assign-identity --data-disk-sizes-gb $DataDiskSizeGB `
+            --tags "CostControl=ignore" --output none
         Assert-LastExitCode "Virtual machine creation"
         az vm auto-shutdown --resource-group $resourceGroupName --name $vmName --time $autoShutdownTimeUtc --output none
         Assert-LastExitCode "Auto-shutdown configuration"
@@ -319,7 +324,7 @@ sudo systemctl restart mongod
     Write-Host "Seed locally:  python ./seed_mongo.py"
     Write-Host "Run app local: python ./app.py"
     Write-Host "Open app:      http://127.0.0.1:5000"
-    Write-Warning "MongoDB (27017) is exposed only to $SshSourceAddressPrefix by NSG rule AllowMongoDb."
+    Write-Warning "MongoDB ($mongoPort) is exposed to all IP addresses by inbound and outbound NSG rules."
     Write-Host "Resource group: $resourceGroupName"
     Write-Host "Cleanup: az group delete --name $resourceGroupName --yes --no-wait"
 }
