@@ -76,6 +76,29 @@ sudo journalctl -u cloud-final -u mongod --no-pager
 
 ## Run from VS Code
 
+### Use the development container
+
+With Docker and the VS Code Dev Containers extension installed, open the
+repository in VS Code and select **Dev Containers: Reopen in Container**.
+The container provides Python, PowerShell, Azure CLI, the project dependencies,
+and the recommended Python, Azure, PowerShell, and MongoDB extensions. pip uses
+Microsoft's package feed proxy so dependency installation also works on managed
+networks that block public package download hosts. Port 5000 is forwarded
+automatically when Flask starts.
+
+Inside the container, deploy and run the project with:
+
+```powershell
+./deploy.ps1
+python ./seed_mongo.py
+python ./app.py
+```
+
+The deployment still requires interactive Azure device-code authentication,
+and `parameters.json` must contain the required configuration.
+
+### Use a local Python environment
+
 Create and activate a virtual environment:
 
 ```powershell
