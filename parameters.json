@@ -1,6 +1,7 @@
 {
   "TenantId": "YOUR",
   "Location": "westeurope",
+  "ResourceToken": "mongo",
   "FallbackLocations": ["eastus2", "eastus", "centralus", "westus2", "northeurope"],
   "VmSize": "Standard_B2s_v2",
   "VmAdminUsername": "YOUR",
