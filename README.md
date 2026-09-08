@@ -1,12 +1,12 @@
 # MongoDB Task Manager on Azure
 
-A local Flask task-management application backed by MongoDB Community Edition on an Azure Ubuntu VM. One PowerShell installer provisions Azure, one Python script loads sample data, and one Python application serves the UI and REST API.
+A local Flask task-management application backed by MongoDB Community Edition on an Azure Ubuntu VM. The deployment also creates an Azure DocumentDB cluster for comparison. One PowerShell installer provisions Azure, one Python script loads sample data, and one Python application serves the UI and REST API.
 
 ## Project files
 
 | File or directory | Purpose |
 | --- | --- |
-| `deploy.ps1` | Signs in to Azure and provisions the VM, network, disk, and MongoDB service |
+| `deploy.ps1` | Signs in to Azure and provisions the VM, network, disk, MongoDB service, and Azure DocumentDB cluster |
 | `parameters.json` | Single source for deployment, MongoDB, Flask, and seed settings |
 | `parameters-editor.html` | Standalone local editor for loading, changing, and saving `parameters.json` |
 | `seed_mongo.py` | Replaces and loads the application data and indexes |
@@ -21,10 +21,11 @@ A local Flask task-management application backed by MongoDB Community Edition on
 - MongoDB authorization is enabled and the configured user is created in the `admin` authentication database.
 - MongoDB listens on all VM interfaces so the local Python processes can connect directly.
 - The network security group limits SSH to `SshSourceAddressPrefix` but allows MongoDB traffic on the configured port from and to all IP addresses.
+- Azure DocumentDB uses the same `MongoUsername` and `MongoPassword`, with public network access and a firewall range of `0.0.0.0` through `255.255.255.255`.
 - Trusted Launch, Secure Boot, vTPM, a managed identity, a Standard public IP, and a Standard SSD are enabled by default through `parameters.json`.
 - VM auto-shutdown defaults to 19:00 UTC and is configurable.
 
-This is a lab architecture. `parameters.json` contains plaintext credentials and must remain private. For production, use Key Vault, SSH keys, private networking, monitoring, and a highly available managed data service.
+This is a lab architecture. `parameters.json` contains plaintext credentials and must remain private. The unrestricted MongoDB and Azure DocumentDB firewall rules are suitable only for temporary testing. For production, use Key Vault, SSH keys, private networking, monitoring, and high availability.
 
 ## Prerequisites
 
@@ -35,7 +36,7 @@ This is a lab architecture. `parameters.json` contains plaintext credentials and
 
 ## Configure parameters
 
-All editable values are in `parameters.json`. This includes Azure placement and VM options, credentials, network ranges, MongoDB settings, Flask host and port, task statuses, and seed data sizes.
+All editable values are in `parameters.json`. This includes Azure placement and VM options, credentials, network ranges, MongoDB and Azure DocumentDB settings, Flask host and port, task statuses, and seed data sizes. Azure DocumentDB defaults to the quickstart configuration: MongoDB 8.0, M30, 128 GB Premium SSD v2, one shard, and high availability disabled.
 
 Open [parameters-editor.html](parameters-editor.html) locally in Microsoft Edge or Chrome:
 
@@ -64,9 +65,11 @@ To use a different JSON file:
 
 The installer uses device-code authentication for `TenantId`, lists enabled subscriptions, and asks you to select one. If `SshSourceAddressPrefix` is empty, it detects your public IP and stores its `/32` CIDR back in the JSON file.
 
-Every deployment deletes and recreates the generated resource group. This permanently deletes its VM, disks, network, public IP, and MongoDB data. If the requested VM SKU is unavailable, the installer checks `FallbackLocations` and uses instance suffix `2` in generated resource names.
+Every deployment deletes and recreates the generated resource group. This permanently deletes its VM, disks, network, public IP, MongoDB data, and Azure DocumentDB cluster. If the requested VM SKU is unavailable, the installer checks `FallbackLocations` and uses instance suffix `2` in generated resource names.
 
-After deployment, the installer updates `MongoUri`, `PublicIpAddress`, `DeploymentLocation`, `ResourceGroupName`, and `VmName` without removing the other settings. Provisioning logs are available on the VM:
+After deployment, the installer updates `MongoUri`, `PublicIpAddress`, `DeploymentLocation`, `ResourceGroupName`, `VmName`, and `DocumentDbClusterName` without removing the other settings. It prints both the VM MongoDB URI and the credential-filled Azure DocumentDB connection string. Treat both values as secrets.
+
+The Azure DocumentDB commands follow the [Microsoft Learn Azure CLI quickstart](https://learn.microsoft.com/azure/documentdb/quickstart-cli).
 
 
 

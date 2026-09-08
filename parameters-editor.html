@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MongoLab Parameters</title>
+  <title>MongoDB and DocumentDB Parameters</title>
   <script>
     (() => {
       const param = new URLSearchParams(window.location.search).get("scoutTheme");
@@ -143,6 +143,19 @@
     }
     .empty strong { display: block; margin-bottom: 6px; font-size: 18px; }
     .empty span { color: var(--cp-text-muted); }
+    .parameter-form { display: grid; gap: 28px; }
+    .parameter-section { min-width: 0; }
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--cp-border);
+    }
+    .section-header h2 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: 0; }
+    .section-count { color: var(--cp-text-soft); font-family: Consolas, "Courier New", Courier, monospace; font-size: 11px; }
     .parameter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
     .field {
       min-width: 0;
@@ -188,7 +201,7 @@
       <div class="identity">
         <div class="mark" aria-hidden="true">{ }</div>
         <div>
-          <h1>MongoLab Parameters</h1>
+          <h1>MongoDB and DocumentDB Parameters</h1>
           <p class="filename" id="filename">No file loaded</p>
         </div>
       </div>
@@ -210,7 +223,7 @@
         <span>Open the project parameter file to begin.</span>
       </div>
     </section>
-    <form class="parameter-grid" id="parameterForm" hidden></form>
+    <form class="parameter-form" id="parameterForm" hidden></form>
 
     <input id="fileInput" type="file" accept="application/json,.json" hidden>
     <footer>Ctrl+S saves the current document</footer>
@@ -230,6 +243,55 @@
     let parameters = null;
     let fileHandle = null;
     let dirty = false;
+
+    const parameterGroups = [
+      {
+        title: "Azure deployment",
+        keys: ["TenantId", "Location", "FallbackLocations", "ResourceToken"]
+      },
+      {
+        title: "Virtual machine",
+        keys: [
+          "VmSize", "VmAdminUsername", "VmAdminPassword", "VmImage", "DataDiskSizeGB",
+          "OsDiskStorageSku", "SecurityType", "AutoShutdownTimeUtc"
+        ]
+      },
+      {
+        title: "Network",
+        keys: [
+          "PublicIpSku", "VnetAddressPrefix", "SubnetAddressPrefix", "SshSourceAddressPrefix"
+        ]
+      },
+      {
+        title: "MongoDB on VM",
+        keys: [
+          "MongoUsername", "MongoPassword", "MongoDatabase", "MongoPort",
+          "MongoServerSelectionTimeoutMs"
+        ]
+      },
+      {
+        title: "Azure DocumentDB",
+        keys: [
+          "DocumentDbServerVersion", "DocumentDbTier", "DocumentDbStorageSizeGB",
+          "DocumentDbStorageType", "DocumentDbShardCount", "DocumentDbHighAvailability"
+        ]
+      },
+      {
+        title: "Flask application",
+        keys: ["FlaskHost", "FlaskPort", "FlaskSecretKey", "TaskStatuses"]
+      },
+      {
+        title: "Seed data",
+        keys: ["SeedUserCount", "SeedProjectCount", "SeedTasksPerProject"]
+      },
+      {
+        title: "Generated deployment values",
+        keys: [
+          "MongoUri", "DocumentDbConnectionString", "PublicIpAddress", "DeploymentLocation",
+          "ResourceGroupName", "VmName", "DocumentDbClusterName"
+        ]
+      }
+    ];
 
     function setStatus(message, state = "") {
       status.textContent = message;
@@ -288,9 +350,7 @@
       return { control: input, input, typeName };
     }
 
-    function render() {
-      form.replaceChildren();
-      Object.entries(parameters).forEach(([key, value]) => {
+    function makeField(key, value) {
         const field = document.createElement("div");
         const { control, input, typeName } = makeInput(key, value);
         field.className = `field ${Array.isArray(value) || (value !== null && typeof value === "object") ? "wide" : ""}`.trim();
@@ -311,8 +371,44 @@
         input.addEventListener("input", markChanged);
         input.addEventListener("change", markChanged);
         field.append(heading, control);
-        form.append(field);
+        return field;
+    }
+
+    function makeSection(title, entries) {
+      const section = document.createElement("section");
+      section.className = "parameter-section";
+
+      const header = document.createElement("div");
+      header.className = "section-header";
+      const heading = document.createElement("h2");
+      heading.textContent = title;
+      const sectionCount = document.createElement("span");
+      sectionCount.className = "section-count";
+      sectionCount.textContent = `${entries.length} ${entries.length === 1 ? "parameter" : "parameters"}`;
+      header.append(heading, sectionCount);
+
+      const grid = document.createElement("div");
+      grid.className = "parameter-grid";
+      entries.forEach(([key, value]) => grid.append(makeField(key, value)));
+      section.append(header, grid);
+      return section;
+    }
+
+    function render() {
+      form.replaceChildren();
+      const renderedKeys = new Set();
+
+      parameterGroups.forEach(({ title, keys }) => {
+        const entries = keys
+          .filter((key) => Object.hasOwn(parameters, key))
+          .map((key) => [key, parameters[key]]);
+        if (entries.length === 0) return;
+        entries.forEach(([key]) => renderedKeys.add(key));
+        form.append(makeSection(title, entries));
       });
+
+      const otherEntries = Object.entries(parameters).filter(([key]) => !renderedKeys.has(key));
+      if (otherEntries.length > 0) form.append(makeSection("Other", otherEntries));
 
       emptyState.hidden = true;
       form.hidden = false;

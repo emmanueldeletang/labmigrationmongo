@@ -19,7 +19,9 @@ $requiredParameters = @(
     "VmAdminUsername", "VmAdminPassword", "VmImage", "DataDiskSizeGB",
     "OsDiskStorageSku", "SecurityType", "PublicIpSku", "VnetAddressPrefix",
     "SubnetAddressPrefix", "AutoShutdownTimeUtc", "SshSourceAddressPrefix",
-    "MongoUsername", "MongoPassword", "MongoDatabase", "MongoPort"
+    "MongoUsername", "MongoPassword", "MongoDatabase", "MongoPort",
+    "DocumentDbServerVersion", "DocumentDbTier", "DocumentDbStorageSizeGB",
+    "DocumentDbStorageType", "DocumentDbShardCount", "DocumentDbHighAvailability"
 )
 foreach ($requiredParameter in $requiredParameters) {
     if ($null -eq $deploymentParameters.$requiredParameter) {
@@ -49,6 +51,12 @@ $autoShutdownTimeUtc = [string]$deploymentParameters.AutoShutdownTimeUtc
 $SshSourceAddressPrefix = [string]$deploymentParameters.SshSourceAddressPrefix
 $mongoUsername = [string]$deploymentParameters.MongoUsername
 $mongoPassword = [string]$deploymentParameters.MongoPassword
+$documentDbServerVersion = [string]$deploymentParameters.DocumentDbServerVersion
+$documentDbTier = [string]$deploymentParameters.DocumentDbTier
+$documentDbStorageSizeGB = [int]$deploymentParameters.DocumentDbStorageSizeGB
+$documentDbStorageType = [string]$deploymentParameters.DocumentDbStorageType
+$documentDbShardCount = [int]$deploymentParameters.DocumentDbShardCount
+$documentDbHighAvailability = [string]$deploymentParameters.DocumentDbHighAvailability
 if ($mongoDatabase -notmatch '^[a-zA-Z0-9_-]+$') {
     throw "MongoDatabase must contain only letters, numbers, underscores, or hyphens."
 }
@@ -121,6 +129,10 @@ az account set --subscription $subscription.Id
 Assert-LastExitCode "Subscription selection"
 Write-Host "Using subscription: $($subscription.Name)"
 
+Write-Host "Installing or updating the Azure DocumentDB CLI extension..."
+az extension add --name documentdb --upgrade --yes --output none
+Assert-LastExitCode "Azure DocumentDB CLI extension installation"
+
 if ([string]::IsNullOrWhiteSpace($ResourceToken)) {
     $ResourceToken = New-LowercaseToken
 }
@@ -156,6 +168,8 @@ $nsgName = "ng$ResourceToken$instance"
 $publicIpName = "ip$ResourceToken$instance"
 $nicName = "ni$ResourceToken$instance"
 $dataDiskName = "dd$ResourceToken$instance"
+$subscriptionToken = $subscription.Id.Replace("-", "").Substring(0, 8).ToLowerInvariant()
+$documentDbClusterName = "docdb-$ResourceToken-$instance-$subscriptionToken"
 
 if ([string]::IsNullOrWhiteSpace($SshSourceAddressPrefix)) {
     try {
@@ -179,7 +193,7 @@ try {
     $cloudInit = $cloudInit.Replace("__MONGO_DATABASE__", $mongoDatabase)
     Set-Content -Path $cloudInitPath -Value $cloudInit -Encoding utf8
 
-    Write-Warning "Resource group $resourceGroupName will be deleted and recreated. This permanently removes its VM, disks, IPs, NSG, network, and MongoDB data."
+    Write-Warning "Resource group $resourceGroupName will be deleted and recreated. This permanently removes its VM, disks, IPs, NSG, network, MongoDB data, and Azure DocumentDB cluster."
     $resourceGroupExist = az group show --name $resourceGroupName 2>$null
     if ($resourceGroupExist) {
         Write-Host "Deleting existing resource group $resourceGroupName..."
@@ -191,6 +205,22 @@ try {
     Write-Host "Creating resource group $resourceGroupName in $selectedLocation..."
     az group create --name $resourceGroupName --location $selectedLocation --output none
     Assert-LastExitCode "Resource group creation"
+
+    Write-Host "Creating Azure DocumentDB cluster $documentDbClusterName..."
+    az documentdb mongocluster create --name $documentDbClusterName --resource-group $resourceGroupName `
+        --location $selectedLocation --admin-user $mongoUsername --admin-password $mongoPassword `
+        --server-version $documentDbServerVersion --tier $documentDbTier `
+        --storage-size $documentDbStorageSizeGB --storage-type $documentDbStorageType `
+        --shard-count $documentDbShardCount --high-availability $documentDbHighAvailability `
+        --auth-allowed-modes NativeAuth --public-network-access Enabled --no-wait --output none
+    Assert-LastExitCode "Azure DocumentDB cluster creation"
+    az documentdb mongocluster wait --name $documentDbClusterName --resource-group $resourceGroupName --created
+    Assert-LastExitCode "Azure DocumentDB cluster provisioning"
+
+    az documentdb mongocluster firewall-rule create --name AllowAllExternal `
+        --cluster-name $documentDbClusterName --resource-group $resourceGroupName `
+        --start-ip-address "0.0.0.0" --end-ip-address "255.255.255.255" --output none
+    Assert-LastExitCode "Azure DocumentDB firewall rule creation"
 
     $vnetExist = az network vnet show --resource-group $resourceGroupName --name $vnetName 2>$null
     if (-not $vnetExist) {
@@ -301,6 +331,16 @@ sudo systemctl restart mongod
     $encodedUsername = [Uri]::EscapeDataString($mongoUsername)
     $encodedPassword = [Uri]::EscapeDataString($mongoPassword)
     $mongoUri = "mongodb://${encodedUsername}:${encodedPassword}@${publicIp}:${mongoPort}/${mongoDatabase}?authSource=admin"
+    $documentDbConnectionString = az documentdb mongocluster list-connection-strings `
+        --cluster-name $documentDbClusterName --resource-group $resourceGroupName `
+        --query "connectionStrings[0].connectionString" --output tsv
+    Assert-LastExitCode "Azure DocumentDB connection string lookup"
+    if ([string]::IsNullOrWhiteSpace($documentDbConnectionString)) {
+        throw "Azure DocumentDB did not return a connection string."
+    }
+    $documentDbConnectionString = $documentDbConnectionString.Replace("<username>", $encodedUsername)
+    $documentDbConnectionString = $documentDbConnectionString.Replace("<user>", $encodedUsername)
+    $documentDbConnectionString = $documentDbConnectionString.Replace("<password>", $encodedPassword)
 
     $generatedParameters = [ordered]@{
         ResourceToken = $ResourceToken
@@ -310,6 +350,7 @@ sudo systemctl restart mongod
         DeploymentLocation = $selectedLocation
         ResourceGroupName = $resourceGroupName
         VmName = $vmName
+        DocumentDbClusterName = $documentDbClusterName
     }
     foreach ($generatedParameter in $generatedParameters.GetEnumerator()) {
         Set-ParameterValue -Parameters $deploymentParameters `
@@ -321,10 +362,12 @@ sudo systemctl restart mongod
     Write-Host "`nDeployment complete."
     Write-Host "SSH: ssh $vmAdminUsername@$publicIp"
     Write-Host "MongoUri: $mongoUri"
+    Write-Host "DocumentDbConnectionString: $documentDbConnectionString"
     Write-Host "Seed locally:  python ./seed_mongo.py"
     Write-Host "Run app local: python ./app.py"
     Write-Host "Open app:      http://127.0.0.1:5000"
     Write-Warning "MongoDB ($mongoPort) is exposed to all IP addresses by inbound and outbound NSG rules."
+    Write-Warning "Azure DocumentDB allows external access from 0.0.0.0 through 255.255.255.255. Use this firewall rule only for testing and development."
     Write-Host "Resource group: $resourceGroupName"
     Write-Host "Cleanup: az group delete --name $resourceGroupName --yes --no-wait"
 }
