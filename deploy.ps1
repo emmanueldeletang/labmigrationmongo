@@ -4,8 +4,8 @@ param(
 )
 
 # Run from Windows PowerShell or PowerShell 7 with Azure CLI installed.
-# The script signs in to the requested tenant, prompts for a subscription and
-# VM password, provisions a private MongoDB VM, and waits for cloud-init.
+# The script reuses an Azure CLI session for the requested tenant when possible,
+# prompts for a subscription, provisions a private MongoDB VM, and waits for cloud-init.
 $ErrorActionPreference = "Continue"
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $temporaryFiles = [System.Collections.Generic.List[string]]::new()
@@ -98,16 +98,31 @@ function New-LowercaseToken {
     -join (1..5 | ForEach-Object { [char](Get-Random -Minimum 97 -Maximum 123) })
 }
 
+function Test-AzureSession {
+    param(
+        [Parameter(Mandatory)]
+        [string]$TenantId
+    )
+
+    az account get-access-token --tenant $TenantId --output none 2>$null
+    return $LASTEXITCODE -eq 0
+}
+
 if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
     throw "Azure CLI was not found. Install it from https://aka.ms/installazurecliwindows."
 }
 
-Write-Host "Signing in to Azure tenant $tenantId using device-code authentication."
-Write-Host "Open the URL shown by Azure CLI in an InPrivate or Incognito browser window, then enter the displayed code."
-az login --tenant $tenantId --use-device-code --output none
-Assert-LastExitCode "Azure login"
+if (Test-AzureSession -TenantId $tenantId) {
+    Write-Host "Reusing the existing Azure CLI session for tenant $tenantId."
+}
+else {
+    Write-Host "No valid Azure CLI session was found for tenant $tenantId. Signing in using device-code authentication."
+    Write-Host "Open the URL shown by Azure CLI in an InPrivate or Incognito browser window, then enter the displayed code."
+    az login --tenant $tenantId --use-device-code --output none
+    Assert-LastExitCode "Azure login"
+}
 
-$subscriptions = @(az account list --query "[?state=='Enabled'].{Name:name,Id:id}" --output json | ConvertFrom-Json)
+$subscriptions = @(az account list --all --query "[?state=='Enabled' && tenantId=='$tenantId'].{Name:name,Id:id}" --output json | ConvertFrom-Json)
 Assert-LastExitCode "Subscription lookup"
 if ($subscriptions.Count -eq 0) {
     throw "No enabled subscriptions are available in tenant $tenantId."
