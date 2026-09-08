@@ -6,7 +6,7 @@ A local Flask task-management application backed by MongoDB Community Edition on
 
 | File or directory | Purpose |
 | --- | --- |
-| `deploy.ps1` | Signs in to Azure and provisions the VM, network, disk, MongoDB service, and Azure DocumentDB cluster |
+| `deploy.ps1` | Reuses an existing Azure CLI session when possible and provisions the VM, network, disk, MongoDB service, and Azure DocumentDB cluster |
 | `parameters.json` | Single source for deployment, MongoDB, Flask, and seed settings |
 | `parameters-editor.html` | Standalone local editor for loading, changing, and saving `parameters.json` |
 | `seed_mongo.py` | Replaces and loads the application data and indexes |
@@ -63,7 +63,7 @@ To use a different JSON file:
 ./deploy.ps1 -ParametersFile ".\parameters.json"
 ```
 
-The installer uses device-code authentication for `TenantId`, lists enabled subscriptions, and asks you to select one. If `SshSourceAddressPrefix` is empty, it detects your public IP and stores its `/32` CIDR back in the JSON file.
+The installer first checks whether Azure CLI already has a valid token for `TenantId`. It reuses that session when available and only starts device-code authentication when login is required. It then lists enabled subscriptions for that tenant and asks you to select one. If `SshSourceAddressPrefix` is empty, it detects your public IP and stores its `/32` CIDR back in the JSON file.
 
 Every deployment deletes and recreates the generated resource group. This permanently deletes its VM, disks, network, public IP, MongoDB data, and Azure DocumentDB cluster. If the requested VM SKU is unavailable, the installer checks `FallbackLocations` and uses instance suffix `2` in generated resource names.
 
