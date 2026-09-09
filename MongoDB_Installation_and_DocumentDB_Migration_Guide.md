@@ -94,11 +94,13 @@ Migration jobs currently require native Azure DocumentDB authentication. Microso
 
 ## **5.1 Open PowerShell in the project**
 
+```powershell
 cd C:\Users\<user>\Downloads\mongolabmigration
 
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 
 .\deploy.ps1
+```
 
 ## **5.2 Complete interactive Azure sign-in**
 
@@ -120,6 +122,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 
 Wait for Deployment complete. The script updates MongoUri, PublicIpAddress, DeploymentLocation, ResourceGroupName, and VmName in parameters.json.
 
+```bash
 ssh <VmAdminUsername>@<PublicIpAddress>
 
 sudo cloud-init status --long
@@ -129,10 +132,13 @@ sudo systemctl status mongod --no-pager
 sudo journalctl -u cloud-final -u mongod --no-pager
 
 exit
+```
 
 From the local workstation, test the source port:
 
+```powershell
 Test-NetConnection -ComputerName <PublicIpAddress> -Port <MongoPort>
+```
 
 Expected result: TcpTestSucceeded is True.
 
@@ -140,6 +146,7 @@ Expected result: TcpTestSucceeded is True.
 
 ## **6.1 Create the virtual environment**
 
+```powershell
 python -m venv .venv
 
 .\.venv\Scripts\Activate.ps1
@@ -147,16 +154,21 @@ python -m venv .venv
 python -m pip install --upgrade pip
 
 python -m pip install -r requirements.txt
+```
 
 ## **6.2 Load the sample database**
 
-python .\seed\_mongo.py
+```powershell
+python .\seed_mongo.py
+```
 
 The default configuration creates 20 users, 500 projects, and 100 tasks per project, for a total of 50,000 tasks.
 
 With the default values, the expected output is:
 
+```text
 Seeded 20 users, 500 projects, and 50000 tasks.
+```
 
 The script creates project\_tasks\_db, replaces the users, projects, and tasks data, and creates indexes for project\_id, assigned\_user\_id, status, and dependencies.
 
@@ -166,9 +178,11 @@ The script creates project\_tasks\_db, replaces the users, projects, and tasks d
 
 ## **6.3 Optional automated test**
 
+```powershell
 python -m pip install -r requirements-dev.txt
 
 python -m pytest -q
+```
 
 The tests use mongomock and do not modify the Azure MongoDB database.
 
@@ -176,14 +190,18 @@ The tests use mongomock and do not modify the Azure MongoDB database.
 
 ## **7.1 Start Flask**
 
+```powershell
 python .\app.py
+```
 
 1. Open http://127.0.0.1:5000, or use the FlaskPort value if it was changed.
 2. Confirm that the dashboard reports the expected user, project, and task counts.
 3. Open Users, Projects, a project task list, and a task detail page.
 4. Test health from another PowerShell terminal.
 
+```powershell
 Invoke-RestMethod http://127.0.0.1:5000/health
+```
 
 Expected response: status is ok. Stop Flask with Ctrl+C when required.
 
@@ -207,9 +225,11 @@ Use Offline migration with Public connectivity for the initial lab migration. Th
 3. Confirm the target user can createCollection, dropCollection, createIndex, insert, and listCollections.
 4. Register Microsoft.DataMigration once in the subscription.
 
+```powershell
 az provider register --namespace Microsoft.DataMigration
 
 az provider show --namespace Microsoft.DataMigration --query registrationState -o tsv
+```
 
 Wait until the registration state is Registered.
 
@@ -217,6 +237,7 @@ Wait until the registration state is Registered.
 
 Microsoft recommends a source migration user with readAnyDatabase and clusterMonitor on admin. The lab application user has clusterMonitor plus readWrite on project\_tasks\_db, but it does not have readAnyDatabase. Ask a MongoDB administrator to create a temporary native migration user or grant the required roles before starting the wizard.
 
+```javascript
 use admin
 
 db.createUser({
@@ -234,6 +255,7 @@ roles: [
 ]
 
 })
+```
 
 Run this in mongosh while authenticated as a user with user-administration privileges. Remove the temporary user after migration.
 
@@ -257,7 +279,9 @@ Official procedure: [Migrate MongoDB using Azure DocumentDB Migration Extension]
 3. Choose Connection String.
 4. Paste a source connection string that uses the temporary migration user and authSource=admin. Base the host and port on PublicIpAddress and MongoPort in parameters.json.
 
+```text
 mongodb://<migration-user>:<encoded-password>@<PublicIpAddress>:<MongoPort>/?authSource=admin
+```
 
 1. Expand the new connection and confirm that project\_tasks\_db and its three collections are visible.
 
@@ -290,17 +314,19 @@ Right-click the expanded source connection, select Data Migration, select Migrat
 
 The wizard displays one or more DMS static IP addresses. Allow each address on both endpoints. For the source VM, add temporary NSG rules without rerunning deploy.ps1, because rerunning the installer deletes the source resource group.
 
+```powershell
 $resourceGroup = "<ResourceGroupName>"
 
 $nsgName = "ng<ResourceToken>1" # confirm the actual NSG name in Azure
 
-$dmsIp = "<DMS\_STATIC\_IP>"
+$dmsIp = "<DMS_STATIC_IP>"
 
 az network nsg rule create --resource-group $resourceGroup --nsg-name $nsgName `
 
 --name AllowMongoFromDms1 --priority 121 --direction Inbound --access Allow `
 
 --protocol Tcp --source-address-prefixes "$dmsIp/32" --destination-port-ranges 27017
+```
 
 Use a unique name and priority for each additional DMS IP. Add the same DMS IPs to the Azure DocumentDB firewall through the wizard or portal.
 
@@ -336,7 +362,8 @@ Use a unique name and priority for each additional DMS IP. Add the same DMS IPs 
 4. Confirm the expected indexes exist on tasks: project\_id, assigned\_user\_id, status, and dependencies.
 5. Sample task documents and verify ObjectId references, dependencies arrays, statuses, and timestamps.
 
-use project\_tasks\_db
+```javascript
+use project_tasks_db
 
 db.users.countDocuments({})
 
@@ -347,6 +374,7 @@ db.tasks.countDocuments({})
 db.tasks.getIndexes()
 
 db.tasks.findOne({})
+```
 
 ## **12.3 Online migration cutover**
 
@@ -372,11 +400,15 @@ Skip this subsection for offline mode. For an online job: wait for initial load 
 
 ## **13.2 Remove temporary migration access**
 
+```powershell
 az network nsg rule delete --resource-group <ResourceGroupName> --nsg-name <NsgName> --name AllowMongoFromDms1
+```
 
+```javascript
 use admin
 
 db.dropUser("<migration-user>")
+```
 
 * Remove every temporary DMS IP from the source NSG and target firewall.
 * Delete an unused DMS only after confirming it is not shared by other migration jobs.
