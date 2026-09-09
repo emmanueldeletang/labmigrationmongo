@@ -30,6 +30,7 @@ def load_parameters():
 
 def seed_database():
     parameters = load_parameters()
+    print(f"Seeding MongoDB database '{parameters['MongoDatabase']}' at '{parameters['MongoUri']}'...")
     client = MongoClient(
         parameters["MongoUri"],
         serverSelectionTimeoutMS=int(parameters["MongoServerSelectionTimeoutMs"]),
