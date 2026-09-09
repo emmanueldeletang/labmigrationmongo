@@ -48,6 +48,13 @@ The browser requires you to select the file explicitly before it grants read/wri
 
 Before deployment, replace `VmAdminPassword`, `MongoPassword`, and `FlaskSecretKey`. The VM password must contain at least 12 characters with uppercase, lowercase, numeric, and special characters. 
 
+Sample Values:
+
+* `VmSize`: `Standard_DS1_v2` or `Standard_F2als_v7`
+* `Location`: `francecentral`,
+* `VnetAddressPrefix`: `10.20.0.0/16`
+* `SubnetAddressPrefix`: `10.20.1.0/24` 
+
 ## Deploy to Azure
 
 From the project directory:
