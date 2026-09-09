@@ -264,6 +264,9 @@ try {
         --priority 120 --direction Outbound --access Allow --protocol Tcp --source-address-prefixes "*" `
         --source-port-ranges "*" --destination-address-prefixes "*" --destination-port-ranges $mongoPort --output none
     Assert-LastExitCode "MongoDB outbound rule creation"
+    az network vnet subnet update --resource-group $resourceGroupName --vnet-name $vnetName --name $subnetName `
+        --network-security-group $nsgName --output none
+    Assert-LastExitCode "Subnet network security group association"
     $appRuleExist = az network nsg rule show --resource-group $resourceGroupName --nsg-name $nsgName --name AllowFlask 2>$null
     if ($appRuleExist) {
         az network nsg rule delete --resource-group $resourceGroupName --nsg-name $nsgName --name AllowFlask --output none
