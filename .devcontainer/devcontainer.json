@@ -5,8 +5,10 @@
     "context": ".."
   },
   "features": {
-    "ghcr.io/devcontainers/features/azure-cli:1.3.0": {},
-    "ghcr.io/devcontainers/features/powershell:1": {}
+    "ghcr.io/devcontainers/features/azure-cli:1.3.0": {
+      "version": "2.90"
+    },
+    "ghcr.io/devcontainers/features/powershell:2.0.3": {}
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "forwardPorts": [
